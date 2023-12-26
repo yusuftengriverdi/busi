@@ -1,0 +1,53 @@
+Arguments:
+ROOT: data/
+MODE: 1
+INCLUDE_NORMAL: True
+WIDTH: 256
+HEIGHT: 256
+SPLIT_RATIO: 0.8:0.1:0.1
+SEED: None
+BATCH_SIZE: 32
+MODEL: Resnet18
+PRETRAINED: False
+TASK: Classification
+OPT: SGD
+LR: 0.0001
+MOMENTUM: 0.9
+LOSS: CrossEntropy
+EP: 20
+TO: cuda
+DATE: 2023-12-26_00-15-09
+LOG: training_runs\2023-12-26_00-15-09\log.txt
+
+General Info: Hello, world!! 
+Date: 2023-12-26 00:15:09
+A sample image info: 
+Image shape: torch.Size([3, 256, 256]), Mask shape: (256, 256),  
+Label: [1 0 0], Filename: benign (262) 
+Sizes of split sets --> 
+ Train: 640 
+Validation: 96 
+Test: 96 
+Dataset is ready!  
+Class weights are calculated as following and will be used in Loss function. [0.5602564102564103, 0.2692307692307692, 0.17051282051282052]  
+Epoch 0, Avg. Loss 0.0  
+Epoch 1, Avg. Loss 0.5590300803834741  
+Epoch 2, Avg. Loss 0.5188520686192946  
+Epoch 3, Avg. Loss 0.47376241738146  
+Epoch 4, Avg. Loss 0.43979751521890814  
+Epoch 5, Avg. Loss 0.4140159487724304  
+Epoch 6, Avg. Loss 0.38823975216258655  
+Epoch 7, Avg. Loss 0.3683145831931721  
+Epoch 8, Avg. Loss 0.352685502984307  
+Epoch 9, Avg. Loss 0.3411135592243888  
+Epoch 10, Avg. Loss 0.33051724325526843  
+Epoch 11, Avg. Loss 0.323429980061271  
+Epoch 12, Avg. Loss 0.3142473670569333  
+Epoch 13, Avg. Loss 0.31070730090141296  
+Epoch 14, Avg. Loss 0.3059399696913632  
+Epoch 15, Avg. Loss 0.30539308894764294  
+Epoch 16, Avg. Loss 0.2995979433709925  
+Epoch 17, Avg. Loss 0.2981920757076957  
+Epoch 18, Avg. Loss 0.2926453162323345  
+Epoch 19, Avg. Loss 0.2893302467736331  
+Metrics logged in: training_runs\2023-12-26_00-15-09\metrics.csv  
