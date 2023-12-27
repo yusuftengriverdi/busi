@@ -11,6 +11,8 @@ import pandas as pd
 import torch
 import os, sys
 from datetime import datetime
+from PIL import Image
+from torch.utils.data import Subset
 
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), "."))
 # Add the parent directory to the Python path
@@ -40,6 +42,19 @@ def get_key_from_value(dict, value):
             if np.argmax(val) == np.argmax(value):
                 return key
     raise ValueError(f"No key found for value: {value}")
+
+
+class TransformedSubset(Subset):
+    def __init__(self, dataset, indices):
+        super(TransformedSubset, self).__init__(dataset, indices)
+        self.transform = dataset.transform
+
+    def __getitem__(self, idx):
+        # Override __getitem__ to apply the transformation
+        item = super(TransformedSubset, self).__getitem__(idx)
+        transformed_item = {'image': self.transform(item['image']), 'mask': item['mask'], 'label': item['label'], 'filename': item['filename']}
+        print(item['label'])
+        return transformed_item
 
 class CustomDataset(Dataset):
     """
@@ -77,22 +92,22 @@ class CustomDataset(Dataset):
         """
         data = []
 
-        if self.mode not in ['0', '1', '2']:
+        if self.mode not in [0, 1, 2]:
             raise ValueError("Invalid mode. Mode must be one of: '0', '1', '2'.")
 
-        if self.mode == '0':
+        if self.mode == 0:
             label_mapping = {
                 'benign': 0,
                 'malignant': 1,
                 'normal': 2
             }
-        elif self.mode == '1':
+        elif self.mode == 1:
             label_mapping = {
                 'benign': [1, 0, 0],
                 'malignant': [0, 1, 0],
                 'normal': [0, 0, 1]
             }
-        elif self.mode == '2':
+        elif self.mode == 2:
 
             raise NotImplementedError
             label_mapping = {
@@ -199,11 +214,11 @@ class CustomDataset(Dataset):
             random_state=self.seed, stratify=train_labels
         )
 
-        self.train_data = [{'image': img, 'mask': m, 'label': label, 'filename': filename}
+        self.train_data = [{'image':self.transform(img) if self.transform else img, 'mask': m, 'label': label, 'filename': filename}
                            for img, m, label, filename in zip(train_data, train_masks, train_labels, train_filenames)]
-        self.val_data = [{'image': img, 'mask': m, 'label': label, 'filename': filename}
+        self.val_data = [{'image': self.transform(img) if self.transform else img, 'mask': m, 'label': label, 'filename': filename}
                          for img, m, label, filename in zip(val_data, val_masks, val_labels, val_filenames)]
-        self.test_data = [{'image': img, 'mask': m, 'label': label, 'filename': filename}
+        self.test_data = [{'image': self.transform(img) if self.transform else img, 'mask': m, 'label': label, 'filename': filename}
                           for img, m, label, filename in zip(test_data, test_masks, test_labels, test_filenames)]
 
     def save_csv(self):
@@ -232,6 +247,9 @@ class CustomDataset(Dataset):
         Returns:
             torch.utils.data.DataLoader: DataLoader for the specified dataset type.
         """
+        if not hasattr(self, 'train_data'):
+            raise ValueError("Subsets not created. Call create_subsets method first.")
+
         if dataset_type == 'train':
             data = self.train_data
         elif dataset_type == 'val':
@@ -246,6 +264,8 @@ class CustomDataset(Dataset):
     def set_transform(self, transform):
 
         self.transform = transform
+        if self.split_ratio:
+            self.split_data()
 
     def __len__(self):
         """
@@ -256,7 +276,7 @@ class CustomDataset(Dataset):
         else:
             return len(self.data)
 
-    def __getitem__(self, idx, dataset_type='train'):
+    def __getitem__(self, idx):
         """
         Returns a sample from the dataset at the given index.
         Args:
@@ -265,17 +285,8 @@ class CustomDataset(Dataset):
         Returns:
             dict: Dictionary containing image, mask (if available), label, and filename.
         """
-        if self.split_ratio:
-            if dataset_type == 'train':
-                item = self.train_data[idx]
-            elif dataset_type == 'val':
-                item = self.val_data[idx]
-            elif dataset_type == 'test':
-                item = self.test_data[idx]
-            else:
-                raise ValueError("Invalid dataset_type. Use 'train', 'val', or 'test'.")
-        else:
-            item = self.data[idx]
+
+        item = self.data[idx]
 
         image = item['image']
         mask = item.get('mask', None)
@@ -322,7 +333,7 @@ def get_data_loaders(args):
 
         normalize = T.Normalize(mean=mean, std=std)
 
-        transform = T.Compose([T.Resize(256), T.CenterCrop(224), T.ToTensor(), normalize])
+        transform = T.Compose([T.ToPILImage(),T.Resize(256), T.CenterCrop(224), T.ToTensor(), normalize])
         # Apply the transformation to the existing dataset
         dataset.set_transform(transform)
         
@@ -338,6 +349,17 @@ def get_data_loaders(args):
     train_dataloader = dataset.get_dataloader('train', args.BATCH_SIZE, shuffle=True)
     val_dataloader = dataset.get_dataloader('val', args.BATCH_SIZE, shuffle=False)
     test_dataloader = dataset.get_dataloader('test', args.BATCH_SIZE, shuffle=False)
+
+    # After creating the dataloaders
+    for subset_name, dataloader in zip(['Train', 'Validation', 'Test'], [train_dataloader, val_dataloader, test_dataloader]):
+        print(f"\nSubset: {subset_name}")
+        sample = next(iter(dataloader))
+        print("Sample Image Shape: ", sample['image'].shape)
+        print("Sample Label Shape: ", sample['label'][0])
+        print("Sample Mask Shape: ", sample['mask'].shape)
+        print("Sample Filename: ", sample['filename'])
+
+        # Add more print statements or visualizations as needed
 
     with open(args.LOG, mode='a') as log_file:
         log_file.write("A sample image info: \n")

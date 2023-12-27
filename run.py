@@ -3,6 +3,7 @@
 from phases.prepare import get_data_loaders
 from phases.train import train
 # from phases.test import test
+from phases.augment import augment
 
 from utilities import parse_arguments
 import os
@@ -47,8 +48,14 @@ else: args.num_classes = 2
 if args.MODEL != 'Resnet18': raise NotImplementedError
 if args.TASK != 'Classification': raise NotImplementedError
 
+if args.AUG:
+    train_loader = augment(args, train_loader, weights)
+
 model = train(args, train_loader = train_loader, val_loader = val_loader, weights = weights)
 
 # Save the model
 torch.save(model.state_dict(), f'{logs_dir}/model.pth')
-# test(model, args)
+# test(args, test_loader, model)
+
+
+# python run.py --LR 0.1 --PRETRAINED --INCLUDE_NORMAL --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ --TO cuda

@@ -1,0 +1,37 @@
+Arguments:
+ROOT: data/
+MODE: 1
+INCLUDE_NORMAL: True
+WIDTH: 256
+HEIGHT: 256
+SPLIT_RATIO: 0.7:0.2:0.1
+SEED: None
+BATCH_SIZE: 32
+MODEL: Resnet18
+PRETRAINED: False
+TASK: Classification
+OPT: SGD
+LR: 0.01
+MOMENTUM: 0.9
+LOSS: CrossEntropy
+EP: 20
+TO: cuda
+P_AUG: 0.7
+DATE: 2023-12-27_04-18-30
+LOG: training_runs\2023-12-27_04-18-30\log.txt
+
+General Info: Hello, world!! 
+Date: 2023-12-27 04:18:30
+A sample image info: 
+Image shape: torch.Size([3, 256, 256]), Mask shape: (256, 256),  
+Label: [1, 0, 0], Filename: benign (1) 
+Sizes of split sets --> 
+ Train: 576 
+Validation: 160 
+Test: 96 
+Dataset is ready!  
+Class weights are calculated as following and will be used in Loss function. [0.5602564102564103, 0.2692307692307692, 0.17051282051282052]  
+Epoch 0, Avg. Loss 0.0  
+Epoch 1, Avg. Loss 0.2767429080427877  
+Epoch 2, Avg. Loss 0.29166107609966735  
+Epoch 3, Avg. Loss 0.35439546633240404  

@@ -10,9 +10,9 @@ def parse_arguments():
 
     # Required arguments
     parser.add_argument("--ROOT", type=str, help="Root path of the dataset", required=True)
-    parser.add_argument("--MODE", type=str, help="Mode (0/1/2)", required=True)
 
     # Optional arguments with default values
+    parser.add_argument("--MODE", type=int, help="Mode (0/1/2)", required=False, default=1)
     parser.add_argument("--INCLUDE_NORMAL", action="store_true", help="Include normal cases", default=False)
     parser.add_argument("--WIDTH", type=int, help="Width for image resizing", default=256)
     parser.add_argument("--HEIGHT", type=int, help="Height for image resizing", default=256)
@@ -42,5 +42,8 @@ def parse_arguments():
 
     # Device argument
     parser.add_argument("--TO", type=str, help="Device type (cuda or cpu).", default= "cpu")
+
+    # Augmentation argument
+    parser.add_argument("--AUG", action="store_true", help="Use augmentation or not", default=False)
 
     return parser.parse_args()

@@ -25,7 +25,7 @@ def calculate_metrics(y, yhat, mode, device, label_mode=1):
         'accuracy_score': Accuracy(task=mode, num_classes=num_classes).to(device),
         'roc_auc_score': AUROC(task=mode, num_classes=num_classes).to(device),
         'f1_score': F1Score(mode, num_classes=num_classes).to(device),
-        # 'confusion': ConfusionMatrix(mode).to(device)
+        # 'confusion': ConfusionMatrix(mode, num_classes=num_classes).to(device)
     }
 
     scores = {
@@ -39,16 +39,13 @@ def calculate_metrics(y, yhat, mode, device, label_mode=1):
     with torch.no_grad():
 
         for metric_name, metric in eval_metrics.items():
-            if metric_name == 'accuracy_score':
+            
+            try:
                 y_max = torch.argmax(y, dim=1).to(device)
                 metric_val = metric(yhat, y_max)
-            elif metric_name == 'roc_auc_score':
-                y_max = torch.argmax(y, dim=1).to(device)
-                metric_val = metric(yhat, y_max)
-            elif metric_name == 'f1_score':
-                y_max = torch.argmax(y, dim=1).to(device)
-                metric_val = metric(yhat, y_max)
-            else: 
+
+            except Exception as e:
+                print(str(e))
                 raise NotImplementedError
 
             scores[metric_name] += metric_val.item()
@@ -127,17 +124,15 @@ def train(args, train_loader, val_loader, weights):
             X = item['image']
             y = item['label']
 
-            if not args.PRETRAINED:
-                X = X / 255.0
+            #if not args.PRETRAINED:
+            X = X / 255.0
             optimizer.zero_grad()
 
-            X = X.permute(0, -1, 1, 2)
             X = X.to(device)
             y = y.float().to(device)
 
-            X = X.requires_grad_()
+            X = X.float().to(device).requires_grad_()
             yhat = model(X).to(device)
-
             loss = criterion(yhat, y)
             y = y.long()
 
@@ -152,6 +147,7 @@ def train(args, train_loader, val_loader, weights):
 
             if batch % 10 == 0:
                 average_loss = train_loss / (batch + 1)
+
 
         train_loss /= len(train_loader)
         train_metrics = {k: v / len(train_loader) for k, v in train_metrics.items()}
@@ -170,15 +166,15 @@ def train(args, train_loader, val_loader, weights):
             X = item['image']
             y = item['label']
 
-            if not args.PRETRAINED:
-                X = X / 255.0
+            # if not args.PRETRAINED:
+            X = X / 255.0
 
-            X = X.permute(0, -1, 1, 2)
+            # X = X.permute(0, -1, 1, 2)
             X = X.to(device)
             y = y.float().to(device)
 
             with torch.no_grad():
-                X = X.requires_grad_()
+                X = X.float().to(device)
                 yhat = model(X)
 
                 loss = criterion(yhat, y)
@@ -191,7 +187,7 @@ def train(args, train_loader, val_loader, weights):
 
         val_loss /= len(val_loader)
         val_metrics = {k: v / len(val_loader) for k, v in val_metrics.items()}
-    
+
         computation_time = (time.time() - start) / 60.0
         # Append metrics to CSV
         row = [ep + 1, train_loss] + list(train_metrics.values()) + [val_loss] + list(val_metrics.values()) + [computation_time]
