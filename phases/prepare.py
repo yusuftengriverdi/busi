@@ -13,6 +13,7 @@ import os, sys
 from datetime import datetime
 from PIL import Image
 from torch.utils.data import Subset
+from .preprocess import preprocess
 
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), "."))
 # Add the parent directory to the Python path
@@ -55,6 +56,32 @@ class TransformedSubset(Subset):
         transformed_item = {'image': self.transform(item['image']), 'mask': item['mask'], 'label': item['label'], 'filename': item['filename']}
         print(item['label'])
         return transformed_item
+    
+
+def calculate_mean_std(dataset, cache_file="mean_std_cache.pth"):
+    if os.path.exists(cache_file):
+        # Load cached mean and std from file
+        mean_std_dict = torch.load(cache_file)
+        mean = mean_std_dict["mean"]
+        std = mean_std_dict["std"]
+    else:
+        # Calculate mean and std
+        means = []
+        stds = []
+        for item in tqdm(dataset, desc="Calculating mean and std"):
+            img = item["image"]
+            means.append(torch.mean(img))
+            stds.append(torch.std(img))
+
+        mean = torch.mean(torch.tensor(means))
+        std = torch.mean(torch.tensor(stds))
+
+        # Save mean and std to cache file
+        mean_std_dict = {"mean": mean, "std": std}
+        torch.save(mean_std_dict, cache_file)
+
+    return mean, std
+
 
 class CustomDataset(Dataset):
     """
@@ -65,7 +92,7 @@ class CustomDataset(Dataset):
         include_normal (bool): Include normal cases in the dataset.
         image_size (tuple): Tuple containing width and height for image resizing.
     """
-    def __init__(self, root_path, mode, include_normal, image_size, split_ratio=None, seed=None, transform=transform, log_dir= None):
+    def __init__(self, root_path, mode, include_normal, image_size, split_ratio=None, seed=None, transform=transform, log_dir= None, preprocessing=False):
         
         self.label_mapping = {}
         self.weights = []
@@ -76,13 +103,14 @@ class CustomDataset(Dataset):
         self.data = self._read_data()
         self.split_ratio = split_ratio
         self.seed = seed
-        
+        self.preprocessing = preprocessing
         self.transform = transform
         if split_ratio:
             self.split_data()
 
         self.dir = log_dir
         self.save_csv()
+
 
     def _read_data(self):
         """
@@ -293,9 +321,13 @@ class CustomDataset(Dataset):
         label = item['label']
         filename = item['filename'] if 'filename' in item else None
 
+
+       # Apply preprocessing if specified in command-line arguments
+        if self.preprocessing:
+            image = preprocess(image)
+
         if self.transform:
             image = self.transform(image)
-
         return {'image': image, 'mask': mask, 'label': label, 'filename': filename}
     
 
@@ -317,25 +349,20 @@ def get_data_loaders(args):
         image_size=(args.WIDTH, args.HEIGHT),
         split_ratio=split_ratio,
         seed=args.SEED,
-        log_dir=args.DATE
+        log_dir=args.DATE,
+        preprocessing=args.PREP
     )
 
     if args.PRETRAINED:
-        means = []
-        stds = []
-        for item in dataset:
-            img = item["image"]
-            means.append(torch.mean(img))
-            stds.append(torch.std(img))
-
-        mean = torch.mean(torch.tensor(means))
-        std = torch.mean(torch.tensor(stds))
+        # Calculate or load mean and std
+        mean, std = calculate_mean_std(dataset)
 
         normalize = T.Normalize(mean=mean, std=std)
 
         transform = T.Compose([T.ToPILImage(),T.Resize(256), T.CenterCrop(224), T.ToTensor(), normalize])
         # Apply the transformation to the existing dataset
         dataset.set_transform(transform)
+
         
     # Example usage:
     # Accessing an example item
@@ -351,13 +378,13 @@ def get_data_loaders(args):
     test_dataloader = dataset.get_dataloader('test', args.BATCH_SIZE, shuffle=False)
 
     # After creating the dataloaders
-    for subset_name, dataloader in zip(['Train', 'Validation', 'Test'], [train_dataloader, val_dataloader, test_dataloader]):
-        print(f"\nSubset: {subset_name}")
-        sample = next(iter(dataloader))
-        print("Sample Image Shape: ", sample['image'].shape)
-        print("Sample Label Shape: ", sample['label'][0])
-        print("Sample Mask Shape: ", sample['mask'].shape)
-        print("Sample Filename: ", sample['filename'])
+    # for subset_name, dataloader in zip(['Train', 'Validation', 'Test'], [train_dataloader, val_dataloader, test_dataloader]):
+    #     print(f"\nSubset: {subset_name}")
+    #     sample = next(iter(dataloader))
+    #     print("Sample Image Shape: ", sample['image'].shape)
+    #     print("Sample Label Shape: ", sample['label'][0])
+    #     print("Sample Mask Shape: ", sample['mask'].shape)
+    #     print("Sample Filename: ", sample['filename'])
 
         # Add more print statements or visualizations as needed
 

@@ -46,4 +46,6 @@ def parse_arguments():
     # Augmentation argument
     parser.add_argument("--AUG", action="store_true", help="Use augmentation or not", default=False)
 
+    parser.add_argument("--PREP", action="store_true", help="Use preprocessing or not", default=False)
+
     return parser.parse_args()

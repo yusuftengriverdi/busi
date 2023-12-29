@@ -8,7 +8,7 @@ import os
 import pickle
 
 from torch.utils.data import Dataset
-
+from .submodules.transforms.elastic import ElasticTransform
 
 class CustomDataset(Dataset):
     def __init__(self, X, y, mask, filename, transform = None):
@@ -114,7 +114,9 @@ def augment(args, loader, ratio, cache_path='tmp/aug.pkl'):
             # T.RandomHorizontalFlip(p=0.5),
             # T.RandomPerspective(p=0.1, distortion_scale=0.2),
             # T.GaussianBlur(kernel_size=(3, 3)),
-            T.RandomRotation([90])        ])
+            # T.RandomRotation([0, 90]) ,
+            ElasticTransform()
+            ])
 
         X_aug = torch.tensor([])
         y_aug = torch.tensor([])
