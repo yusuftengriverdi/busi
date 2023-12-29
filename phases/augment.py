@@ -110,12 +110,11 @@ def augment(args, loader, ratio, cache_path='tmp/aug.pkl'):
 
         # Define transforms.
         transform = T.Compose(transforms=[
-            T.RandomVerticalFlip(p=0.5),
+            # T.RandomVerticalFlip(p=0.5),
             # T.RandomHorizontalFlip(p=0.5),
             # T.RandomPerspective(p=0.1, distortion_scale=0.2),
-            T.GaussianBlur(kernel_size=(3, 3)),
-            # T.RandomRotation((0, 180))
-        ])
+            # T.GaussianBlur(kernel_size=(3, 3)),
+            T.RandomRotation([90])        ])
 
         X_aug = torch.tensor([])
         y_aug = torch.tensor([])
