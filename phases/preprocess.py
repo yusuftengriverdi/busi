@@ -4,6 +4,19 @@ except ImportError as e:
     from submodules.srad import srad
 import numpy as np
 import cv2
+import torch 
+
+
+# Reference of preprocessing: 
+
+# @inproceedings{inproceedings,
+# author = {Almajalid, Rania and Shan, Juan and Du, Yaodong and Zhang, Ming},
+# year = {2018},
+# month = {12},
+# pages = {1103-1108},
+# title = {Development of a Deep-Learning-Based Method for Breast Ultrasound Image Segmentation},
+# doi = {10.1109/ICMLA.2018.00179}
+# }
 
 def apply_clahe(image, clip_limit=2.0, grid_size=(5, 5)):
     """
@@ -38,11 +51,19 @@ def apply_histogram_equalization(image):
         numpy.ndarray: Image after applying Histogram Equalization.
     """
     # Convert image to grayscale if it's in color
+    exception_flag = False
     if len(image.shape) == 3:
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        try: 
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        except Exception as e:
+            image = cv2.cvtColor(image.transpose(1, 2, 0), cv2.COLOR_BGR2GRAY)
+            orig_shape = image.shape
+            exception_flag = True
 
     # Apply histogram equalization
     equalized_image = cv2.equalizeHist(image)
+    if exception_flag:
+        equalized_image = torch.tensor(equalized_image).view(orig_shape)
 
     return equalized_image
 

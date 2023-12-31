@@ -6,17 +6,19 @@ import torch
 import datetime
 import os
 import pickle
+from .preprocess import preprocess
 
 from torch.utils.data import Dataset
 from .submodules.transforms.elastic import ElasticTransform
 
 class CustomDataset(Dataset):
-    def __init__(self, X, y, mask, filename, transform = None):
+    def __init__(self, X, y, mask, filename, transform = None, preprocessing=False):
         self.X = X
         self.y = y
         self.mask = mask
         self.filename = filename
         self.transform = transform
+        self.preprocessing = preprocessing
 
     def set_transform(self, transform):
 
@@ -31,6 +33,10 @@ class CustomDataset(Dataset):
         mask = self.mask[idx]
         label = self.y[idx]
         filename = self.filename[idx]
+
+        if self.preprocessing:
+
+            image = preprocess(np.array(image))
 
         if self.transform:
             image = self.transform(image)
@@ -169,7 +175,7 @@ def augment(args, loader, ratio, cache_path='tmp/aug.pkl'):
         filename_combined = filenames + filename_aug
         # Create DataLoader for combined data
         print(X_combined.shape, y_combined.shape)
-        combined_dataset = CustomDataset(X_combined, y_combined, mask_combined, filename_combined)
+        combined_dataset = CustomDataset(X_combined, y_combined, mask_combined, filename_combined, preprocessing=False)
 
         if args.PRETRAINED:
             means = []
@@ -188,6 +194,7 @@ def augment(args, loader, ratio, cache_path='tmp/aug.pkl'):
             # Apply the transformation to the existing dataset
             combined_dataset.set_transform(transform)
 
+        combined_dataset.preprocessing = True
         combined_loader = DataLoader(combined_dataset, batch_size=args.BATCH_SIZE, shuffle=True)
 
         # Log augmented samples

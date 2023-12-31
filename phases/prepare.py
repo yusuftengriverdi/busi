@@ -324,6 +324,7 @@ class CustomDataset(Dataset):
 
        # Apply preprocessing if specified in command-line arguments
         if self.preprocessing:
+
             image = preprocess(image)
 
         if self.transform:
