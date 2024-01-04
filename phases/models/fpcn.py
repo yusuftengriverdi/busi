@@ -6,8 +6,8 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 
-from resnet import resnet18_features
-from layers import conv1x1_bn, conv3x3_bn
+from .resnet import resnet18_features
+from .layers import conv1x1_bn, conv3x3_bn
 import numpy as  np
 
 # Source: https://github.com/c0nn3r/RetinaNet/blob/master/resnet_features.py 
@@ -33,7 +33,7 @@ class FeaturePyramid(nn.Module):
     def _upsample(self, original_feature, scaled_feature, scale_factor=2):
         # is this correct? You do lose information on the upscale...
         height, width = scaled_feature.size()[2:]
-        return F.interpolate(original_feature, scale_factor=scale_factor, mode='bilinear')[:, :, :height, :width]
+        return F.interpolate(original_feature, scale_factor=scale_factor, mode='bilinear', align_corners = True)[:, :, :height, :width]
 
     def forward(self, x):
 

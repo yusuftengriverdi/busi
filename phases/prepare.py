@@ -242,11 +242,11 @@ class CustomDataset(Dataset):
             random_state=self.seed, stratify=train_labels
         )
 
-        self.train_data = [{'image':self.transform(img) if self.transform else img, 'mask': m, 'label': label, 'filename': filename}
+        self.train_data = [{'image':self.transform(img) if self.transform else img, 'mask': self.transform(m) if self.transform else m, 'label': label, 'filename': filename}
                            for img, m, label, filename in zip(train_data, train_masks, train_labels, train_filenames)]
-        self.val_data = [{'image': self.transform(img) if self.transform else img, 'mask': m, 'label': label, 'filename': filename}
+        self.val_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.transform(m) if self.transform else m, 'label': label, 'filename': filename}
                          for img, m, label, filename in zip(val_data, val_masks, val_labels, val_filenames)]
-        self.test_data = [{'image': self.transform(img) if self.transform else img, 'mask': m, 'label': label, 'filename': filename}
+        self.test_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.transform(m) if self.transform else m, 'label': label, 'filename': filename}
                           for img, m, label, filename in zip(test_data, test_masks, test_labels, test_filenames)]
 
     def save_csv(self):
@@ -321,7 +321,6 @@ class CustomDataset(Dataset):
         label = item['label']
         filename = item['filename'] if 'filename' in item else None
 
-
        # Apply preprocessing if specified in command-line arguments
         if self.preprocessing:
 
@@ -329,6 +328,8 @@ class CustomDataset(Dataset):
 
         if self.transform:
             image = self.transform(image)
+            mask = self.transform(mask)
+
         return {'image': image, 'mask': mask, 'label': label, 'filename': filename}
     
 
@@ -387,7 +388,7 @@ def get_data_loaders(args):
     #     print("Sample Mask Shape: ", sample['mask'].shape)
     #     print("Sample Filename: ", sample['filename'])
 
-        # Add more print statements or visualizations as needed
+    # Add more print statements or visualizations as needed
 
     with open(args.LOG, mode='a') as log_file:
         log_file.write("A sample image info: \n")

@@ -13,6 +13,8 @@ import torch
 # Specify the arguments as needed
 args = parse_arguments()
 
+if args.USE_MASK: args.ATTENTION = True
+
 # Set date as unique id.
 args.DATE = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -46,10 +48,11 @@ if args.INCLUDE_NORMAL: args.num_classes = 3
 else: args.num_classes = 2
 
 if args.MODEL != 'Resnet18': raise NotImplementedError
-if args.TASK != 'Classification': raise NotImplementedError
+if args.TASK != 'Classify': raise NotImplementedError
 
 if args.AUG:
     train_loader = augment(args, train_loader, weights)
+
 
 model = train(args, train_loader = train_loader, val_loader = val_loader, weights = weights)
 
@@ -58,4 +61,4 @@ torch.save(model.state_dict(), f'{logs_dir}/model.pth')
 # test(args, test_loader, model)
 
 
-# python run.py --LR 0.1 --PRETRAINED --INCLUDE_NORMAL --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ --TO cuda
+ # python run.py --LR 0.01 --PRETRAINED --PREP --LOSS Focal --INCLUDE_NORMAL --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ --TO cuda --ATTENTION

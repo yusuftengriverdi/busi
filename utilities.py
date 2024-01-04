@@ -11,7 +11,7 @@ def parse_arguments():
     # Required arguments
     parser.add_argument("--ROOT", type=str, help="Root path of the dataset", required=True)
 
-    # Optional arguments with default values
+    # Data-related arguments.
     parser.add_argument("--MODE", type=int, help="Mode (0/1/2)", required=False, default=1)
     parser.add_argument("--INCLUDE_NORMAL", action="store_true", help="Include normal cases", default=False)
     parser.add_argument("--WIDTH", type=int, help="Width for image resizing", default=256)
@@ -29,14 +29,14 @@ def parse_arguments():
     parser.add_argument("--PRETRAINED", action="store_true", help="Pretrained or not", default=False)
 
     # Task argument
-    parser.add_argument("--TASK", type=str, help="Classification, Segmentation, or both.", default= "Classification")
+    parser.add_argument("--TASK", type=str, help="Classify, Segment, or both.", default= "Classify")
 
-    # Optimizer argument
+    # Optimizer arguments
     parser.add_argument("--OPT", type=str, help="Optimizer type.", default= "SGD")
     parser.add_argument("--LR", type=float, help="Learning rate (static)", default= 1e-4)
     parser.add_argument("--MOMENTUM", type=float, help="Momentum", default= 0.9)
 
-    # Training argument
+    # Training arguments
     parser.add_argument("--LOSS", type=str, help="Optimizer type.", default= "CrossEntropy")
     parser.add_argument("--EP", type=int, help="Number of Epochs", default= 20)
 
@@ -46,6 +46,11 @@ def parse_arguments():
     # Augmentation argument
     parser.add_argument("--AUG", action="store_true", help="Use augmentation or not", default=False)
 
+    # Preprocessing argument
     parser.add_argument("--PREP", action="store_true", help="Use preprocessing or not", default=False)
+
+    # Attention argument.
+    parser.add_argument("--ATTENTION", action="store_true", help="Use spatial attention layer or not", default=False)
+    parser.add_argument("--USE_MASK", action="store_true", help="Use spatial attention layer or not", default=False)
 
     return parser.parse_args()
