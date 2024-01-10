@@ -162,6 +162,8 @@ class Unet(nn.Module):
 
         self.replaced_conv1 = False  # for accommodating  inputs with different number of channels later
 
+        self.softmax = nn.Softmax(dim=1)
+
     def freeze_encoder(self):
 
         """ Freezing encoder parameters, the newly initialized decoder parameters are remaining trainable. """
@@ -180,6 +182,7 @@ class Unet(nn.Module):
             x = upsample_block(x, skip_features)
 
         x = self.final_conv(x)
+        x = self.softmax(x)  # Add softmax activation 
         return x
 
     def forward_backbone(self, x):

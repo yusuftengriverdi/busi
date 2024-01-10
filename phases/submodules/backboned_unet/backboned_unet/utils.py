@@ -108,14 +108,14 @@ def dice_score(input, target, classes, ignore_index=-100):
     target[target == ignore_index] = 0
     valid = valid.float()
 
-    # converting to onehot image with class channels
-    onehot_target = torch.LongTensor(target.shape[0], classes, target.shape[-2], target.shape[-1]).zero_().cuda()
-    onehot_target.scatter_(1, target, 1)  # write ones along "channel" dimension
-    # classes_in_image = onehot_gt_tensor.sum([2, 3]) > 0
-    onehot_target = onehot_target.float()
+    # # converting to onehot image with class channels
+    # onehot_target = torch.LongTensor(target.shape[0], classes, target.shape[-2], target.shape[-1]).zero_().cuda()
+    # onehot_target.scatter_(1, target, 1)  # write ones along "channel" dimension
+    # # classes_in_image = onehot_gt_tensor.sum([2, 3]) > 0
+    # onehot_target = onehot_target.float()
 
     # keeping the valid pixels only
-    onehot_target = onehot_target * valid
+    onehot_target = target * valid
     input = input * valid
 
     dice = 2 * (input * onehot_target).sum([2, 3]) / ((input**2).sum([2, 3]) + (onehot_target**2).sum([2, 3]))
@@ -145,6 +145,20 @@ class DiceLoss(torch.nn.Module):
         else:
             raise ValueError('Loss mode unknown. Please use \'negative_log\' or \'one_minus\'!')
 
+# My addition to code. 
+class SoftIoUScore(torch.nn.Module):
+    def __init__(self, classes, ignore_index=255, ignore_background=True):
+        super(SoftIoUScore, self).__init__()
+        self.classes = classes
+        self.ignore_index = ignore_index
+        self.ignore_background = ignore_background
+
+    def forward(self, input, target):
+        soft_iou_score = soft_iou(input, target, classes=self.classes,
+                                  ignore_index=self.ignore_index,
+                                  ignore_background=self.ignore_background)
+        # loss = 1 - soft_iou_score.mean()  # You can customize the loss calculation here
+        return soft_iou_score
 
 if __name__ == "__main__":
 

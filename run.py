@@ -1,5 +1,5 @@
 # Inside run.py
-
+import torch
 from phases.prepare import get_data_loaders
 from phases.train import train
 # from phases.test import test
@@ -8,7 +8,6 @@ from phases.augment import augment
 from utilities import parse_arguments
 import os
 from datetime import datetime
-import torch
 
 # Specify the arguments as needed
 args = parse_arguments()
@@ -47,8 +46,8 @@ train_loader, val_loader, test_loader, weights = get_data_loaders(args)
 if args.INCLUDE_NORMAL: args.num_classes = 3
 else: args.num_classes = 2
 
-if args.MODEL != 'Resnet18': raise NotImplementedError
-if args.TASK != 'Classify': raise NotImplementedError
+if not args.MODEL in ['Resnet18', 'Unet']: raise NotImplementedError
+if not args.TASK in ['Classify', 'Segment']: raise NotImplementedError
 
 if args.AUG:
     train_loader = augment(args, train_loader, weights)
@@ -60,5 +59,10 @@ model = train(args, train_loader = train_loader, val_loader = val_loader, weight
 torch.save(model.state_dict(), f'{logs_dir}/model.pth')
 # test(args, test_loader, model)
 
+# Best results classification so far.
 
- # python run.py --LR 0.01 --PRETRAINED --PREP --LOSS Focal --INCLUDE_NORMAL --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ --TO cuda --ATTENTION
+# python run.py --LR 0.01 --PRETRAINED --PREP --LOSS Focal --INCLUDE_NORMAL --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ --TO cuda --ATTENTION
+
+# Best results segmentation so far.
+
+# python run.py --LR 0.01 --PRETRAINED --PREP --LOSS Dice --MODEL Unet --TASK Segment --INCLUDE_NORMAL --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ --TO cuda

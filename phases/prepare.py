@@ -92,7 +92,13 @@ class CustomDataset(Dataset):
         include_normal (bool): Include normal cases in the dataset.
         image_size (tuple): Tuple containing width and height for image resizing.
     """
-    def __init__(self, root_path, mode, include_normal, image_size, split_ratio=None, seed=None, transform=transform, log_dir= None, preprocessing=False):
+    def __init__(self, root_path, mode, include_normal, image_size, 
+                 split_ratio=None, 
+                 seed=None, 
+                 transform=transform, 
+                 mask_transform=transform,
+                 log_dir= None, 
+                 preprocessing=False):
         
         self.label_mapping = {}
         self.weights = []
@@ -105,6 +111,7 @@ class CustomDataset(Dataset):
         self.seed = seed
         self.preprocessing = preprocessing
         self.transform = transform
+        self.mask_transform = mask_transform
         if split_ratio:
             self.split_data()
 
@@ -173,6 +180,10 @@ class CustomDataset(Dataset):
                     if os.path.exists(mask_path):
                         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
                         mask = cv2.resize(mask, self.image_size)
+                        # Beta: Binarize again.
+                        mask[mask > 256/2] = 255
+                        mask[mask <= 256/2] = 0
+
                     else:
                         mask = None
 
@@ -242,11 +253,11 @@ class CustomDataset(Dataset):
             random_state=self.seed, stratify=train_labels
         )
 
-        self.train_data = [{'image':self.transform(img) if self.transform else img, 'mask': self.transform(m) if self.transform else m, 'label': label, 'filename': filename}
+        self.train_data = [{'image':self.transform(img) if self.transform else img, 'mask': self.mask_transform(m) if self.mask_transform else m, 'label': label, 'filename': filename}
                            for img, m, label, filename in zip(train_data, train_masks, train_labels, train_filenames)]
-        self.val_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.transform(m) if self.transform else m, 'label': label, 'filename': filename}
+        self.val_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.mask_transform(m) if self.mask_transform else m, 'label': label, 'filename': filename}
                          for img, m, label, filename in zip(val_data, val_masks, val_labels, val_filenames)]
-        self.test_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.transform(m) if self.transform else m, 'label': label, 'filename': filename}
+        self.test_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.mask_transform(m) if self.mask_transform else m, 'label': label, 'filename': filename}
                           for img, m, label, filename in zip(test_data, test_masks, test_labels, test_filenames)]
 
     def save_csv(self):
@@ -289,11 +300,14 @@ class CustomDataset(Dataset):
 
         return DataLoader(data, batch_size=batch_size, shuffle=shuffle)
     
-    def set_transform(self, transform):
+    def set_transform(self, transform, mask_transform = None):
 
         self.transform = transform
+        if mask_transform:
+            self.mask_transform = mask_transform
         if self.split_ratio:
             self.split_data()
+
 
     def __len__(self):
         """
@@ -328,7 +342,9 @@ class CustomDataset(Dataset):
 
         if self.transform:
             image = self.transform(image)
-            mask = self.transform(mask)
+
+        if self.mask_transform:
+            mask = self.mask_transform(mask)
 
         return {'image': image, 'mask': mask, 'label': label, 'filename': filename}
     
@@ -362,8 +378,11 @@ def get_data_loaders(args):
         normalize = T.Normalize(mean=mean, std=std)
 
         transform = T.Compose([T.ToPILImage(),T.Resize(256), T.CenterCrop(224), T.ToTensor(), normalize])
+        
+        # Do not normalize mask!
+        mask_transform = T.Compose([T.ToPILImage(),T.Resize(256), T.CenterCrop(224), T.ToTensor()])
         # Apply the transformation to the existing dataset
-        dataset.set_transform(transform)
+        dataset.set_transform(transform, mask_transform=mask_transform)
 
         
     # Example usage:

@@ -53,4 +53,7 @@ def parse_arguments():
     parser.add_argument("--ATTENTION", action="store_true", help="Use spatial attention layer or not", default=False)
     parser.add_argument("--USE_MASK", action="store_true", help="Use spatial attention layer or not", default=False)
 
+    # Segmentation arguments.
+    parser.add_argument("--BACKBONE", type=str, help="Backbone model type, resnet18 supported, please use lower case", default= "resnet18")
+
     return parser.parse_args()
