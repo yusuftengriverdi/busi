@@ -7,12 +7,13 @@ from torcheval.metrics import MulticlassAccuracy, MulticlassF1Score, MulticlassP
 import os, csv
 import time
 from .losses.focal import FocalLoss
+from .losses.dice import DiceLoss
 from .models.fpcn import FPCN
 from .submodules import attention
 from .submodules.backboned_unet import backboned_unet as unet 
-from .submodules import segmetrics
 
-def calculate_clf_metrics(y, yhat, mode, device, label_mode=1):
+
+def calculate_clf_metrics(y, yhat, mode, device):
     """
     Calculate evaluation metrics given ground truth (y) and predicted values (yhat).
     Args:
@@ -83,7 +84,7 @@ def calculate_clf_metrics(y, yhat, mode, device, label_mode=1):
         return scores
 
 
-def calculate_seg_metrics(y, yhat, mode, device, label_mode=1):
+def calculate_seg_metrics(y, yhat, mode, device):
     """
     Calculate evaluation metrics given ground truth (y) and predicted values (yhat).
     Args:
@@ -100,7 +101,7 @@ def calculate_seg_metrics(y, yhat, mode, device, label_mode=1):
     
     eval_seg_metrics = {
         'accuracy_score': Accuracy(task=mode, num_classes=num_classes).to(device),
-        'dice_score': Dice(num_classes=num_classes, average='macro').to(device),
+        'dice_score': DiceLoss(return_score=True),
         'roc_auc_score': AUROC(task=mode, num_classes=num_classes).to(device),
         # 'cohen_kappa_score': segmetrics.kapp_score_Value,
         # 'mse_log_error': segmetrics.mse,
@@ -124,13 +125,8 @@ def calculate_seg_metrics(y, yhat, mode, device, label_mode=1):
         for metric_name, metric in eval_seg_metrics.items():
             
             try:
-                if metric_name == 'accuracy_score':
-                    yhat = torch.argmax(yhat, dim=1).unsqueeze(dim=1)
-
-                if metric_name == 'dice_score':
-                    y = y.int()
-                    
-                metric_val = metric(yhat, y)
+                # yhat = torch.argmax(yhat, dim=1).unsqueeze(dim=1)
+                metric_val = metric(yhat, y.int())
                 scores[metric_name] += metric_val
 
             except Exception as e:
@@ -193,6 +189,18 @@ def train(args, train_loader, val_loader, weights):
     elif args.TASK == 'Segment':
         if args.MODEL == 'Unet':
             model = unet.unet.Unet(backbone_name=args.BACKBONE, pretrained=args.PRETRAINED, classes=args.num_classes)
+        elif args.MODEL == 'DeepLabv3':
+            model = models.segmentation.deeplabv3_resnet50(pretrained=args.PRETRAINED, aux_loss=False)
+            model.classifier[4] = torch.nn.Conv2d(256, 2, kernel_size=(1,1), stride=(1,1))
+            model.aux_classifier[4] = torch.nn.Conv2d(256, 2, kernel_size=(1,1), stride=(1,1))
+        else:
+            raise ValueError("Please select a valid model for Segmentification problem.")
+
+    elif args.TASK == 'Both':
+        if args.MODEL == 'Retina':
+            model = models.detection.retinanet_resnet50_fpn(pretrained=args.PRETRAINED, 
+                                                            num_classes=args.num_classes,
+                                                            pretrained_backbone=True)
         else:
             raise ValueError("Please select a valid model for Segmentification problem.")
 
@@ -206,6 +214,10 @@ def train(args, train_loader, val_loader, weights):
     # Call optimizer.
     if args.OPT == 'SGD':
         optimizer = optim.SGD(model.parameters(),
+                              lr=args.LR,
+                              weight_decay=args.MOMENTUM)
+    elif args.OPT == 'Adam':
+        optimizer = optim.Adam(model.parameters(),
                               lr=args.LR,
                               weight_decay=args.MOMENTUM)
     else:
@@ -224,11 +236,11 @@ def train(args, train_loader, val_loader, weights):
 
     elif args.TASK == 'Segment':
         if args.LOSS == 'Dice':
-            criterion = Dice(num_classes=args.num_classes, average='macro')
+            criterion = DiceLoss(reduction=None)
         elif args.LOSS == 'MSE':
-            criterion = torch.nn.MSELoss(reduction='mean')
+            criterion = torch.nn.MSELoss(reduction='sum')
         elif args.LOSS == 'CrossEntropy':
-            criterion = torch.nn.CrossEntropyLoss().to(device)
+            criterion = torch.nn.CrossEntropyLoss(weight=weights).to(device)
         elif args.LOSS == 'DiceCE':
             raise NotImplementedError
         else:
@@ -263,9 +275,10 @@ def train(args, train_loader, val_loader, weights):
                     'f1_score': 0.0,
                 }
         elif args.TASK == 'Segment':
-            train_metrics =  {  'accuracy_score': 0.0,
-        'dice_score': 0.0,
-        'roc_auc_score': 0.0
+            train_metrics =  {  
+                'accuracy_score': 0.0,
+                'dice_score': 0.0,
+                'roc_auc_score': 0.0
         # 'cohen_kappa_score': 0.0,
         # 'mse_log_error': 0.0,
         # 'nmi_score': 0.0,
@@ -279,10 +292,13 @@ def train(args, train_loader, val_loader, weights):
             X = item['image']
             y = item['label']
             m_ = item['mask'].to(device)
-            # Stack the single-channel mask along the channel dimension
-            m = torch.cat([m_] * args.num_classes, dim=1)
-            
-            # print("\n \n Mask properties: ", m.shape, torch.unique(m))
+            # Create a tensor filled with zeros of shape (batch_size, num_classes, w, h)
+            m = torch.zeros((m_.shape[0], args.num_classes, m_.shape[2], m_.shape[3]), device=device)
+
+            # Iterate over classes and set the corresponding channel to 1 where m_ equals the class index
+            for class_index in range(args.num_classes):
+                m[:, class_index, :, :] = (m_ == class_index).float().squeeze(1)
+
 
             X = X / 255.0
             optimizer.zero_grad()
@@ -293,7 +309,11 @@ def train(args, train_loader, val_loader, weights):
             X = X.float().to(device).requires_grad_()
 
             if not args.USE_MASK:
-                yhat = model(X).to(device)
+                if args.MODEL != 'DeepLabv3':
+                    yhat = model(X).to(device)
+                else:
+                    yhat = model(X)['out'].to(device)
+
             else: 
                 yhat = model(X, mask=m).to(device)
             
@@ -306,7 +326,7 @@ def train(args, train_loader, val_loader, weights):
 
             elif args.TASK == 'Segment':
                 loss = criterion(yhat, m)
-                train_metrics = {k: v + calculate_seg_metrics(m_, yhat, mode, device)[k] for k, v in train_metrics.items()}
+                train_metrics = {k: v + calculate_seg_metrics(m, yhat, mode, device)[k] for k, v in train_metrics.items()}
             else:
                 raise NotImplementedError
             
@@ -349,22 +369,29 @@ def train(args, train_loader, val_loader, weights):
                     'f1_score': 0.0,
                 }
         elif args.TASK == 'Segment':
-                val_metrics = {        'accuracy_score': 0.0,
-        'dice_score': 0.0,
-        'roc_auc_score': 0.0
+                val_metrics = {        
+                    'accuracy_score': 0.0,
+                    'dice_score': 0.0,
+                    'roc_auc_score': 0.0
         # 'cohen_kappa_score': 0.0,
         # 'mse_log_error': 0.0,
         # 'nmi_score': 0.0,
         # 'roc_auc_score': 0.0,
-    }
+        }
 
         for batch, item in enumerate(val_loader):
 
             X = item['image']
             y = item['label']
             m_ = item['mask'].to(device)
-            # Stack the single-channel mask along the channel dimension
-            m = torch.cat([m_] * args.num_classes, dim=1)
+
+            # Create a tensor filled with zeros of shape (batch_size, num_classes, w, h)
+            m = torch.zeros((m_.shape[0], args.num_classes, m_.shape[2], m_.shape[3]), device=device)
+
+            # Iterate over classes and set the corresponding channel to 1 where m_ equals the class index
+            for class_index in range(args.num_classes):
+                m[:, class_index, :, :] = (m_ == class_index).float().squeeze(1)
+
             # print("Mask properties: ", m.shape, torch.unique(m))
             # if not args.PRETRAINED:
             X = X / 255.0
@@ -375,7 +402,11 @@ def train(args, train_loader, val_loader, weights):
 
             with torch.no_grad():
                 X = X.float().to(device)
-                yhat = model(X)
+                if args.MODEL != 'DeepLabv3':
+                    yhat = model(X).to(device)
+                else:
+                    yhat = model(X)['out'].to(device)
+
 
                 if args.TASK == 'Classify':
                     loss = criterion(yhat, y)
@@ -383,7 +414,7 @@ def train(args, train_loader, val_loader, weights):
                     val_metrics = {k: v + calculate_clf_metrics(y, yhat, mode, device)[k] for k, v in val_metrics.items()}
                 elif args.TASK == 'Segment':
                     loss = criterion(yhat, m)
-                    val_metrics = {k: v + calculate_seg_metrics(m_, yhat, mode, device)[k] for k, v in val_metrics.items()}
+                    val_metrics = {k: v + calculate_seg_metrics(m, yhat, mode, device)[k] for k, v in val_metrics.items()}
 
                 else:
                     raise NotImplementedError

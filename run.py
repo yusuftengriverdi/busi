@@ -2,7 +2,7 @@
 import torch
 from phases.prepare import get_data_loaders
 from phases.train import train
-# from phases.test import test
+from phases.test import test
 from phases.augment import augment
 
 from utilities import parse_arguments
@@ -46,7 +46,7 @@ train_loader, val_loader, test_loader, weights = get_data_loaders(args)
 if args.INCLUDE_NORMAL: args.num_classes = 3
 else: args.num_classes = 2
 
-if not args.MODEL in ['Resnet18', 'Unet']: raise NotImplementedError
+if not args.MODEL in ['Resnet18', 'Unet', 'DeepLabv3']: raise NotImplementedError
 if not args.TASK in ['Classify', 'Segment']: raise NotImplementedError
 
 if args.AUG:
@@ -57,7 +57,8 @@ model = train(args, train_loader = train_loader, val_loader = val_loader, weight
 
 # Save the model
 torch.save(model.state_dict(), f'{logs_dir}/model.pth')
-# test(args, test_loader, model)
+
+# test(args, test_loader)
 
 # Best results classification so far.
 

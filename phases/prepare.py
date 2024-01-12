@@ -220,8 +220,10 @@ class CustomDataset(Dataset):
         label_counter['malignant'] /= label_counter['sum']
         label_counter['normal'] /= label_counter['sum']
 
-        self.weights = list(label_counter.values())[:-1]
-
+        if self.include_normal:
+            self.weights = list(label_counter.values())[:-1]
+        else:
+            self.weights = list(label_counter.values())[:-2]
         return data
 
     def split_data(self):

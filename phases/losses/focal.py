@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torch.autograd import Variable
-
 class FocalLoss(nn.Module):
     def __init__(self, alpha=0.3, gamma=1, weight= None, reduction='sum'):
         super(FocalLoss, self).__init__()
