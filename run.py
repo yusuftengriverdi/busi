@@ -1,11 +1,12 @@
 # Inside run.py
 import torch
+from phases.preprocess import preprocess_all
 from phases.prepare import get_data_loaders
 from phases.train import train
 from phases.test import test
 from phases.augment import augment
 
-from utilities import parse_arguments
+from config import parse_arguments
 import os
 from datetime import datetime
 
@@ -27,6 +28,7 @@ log_file_path = os.path.join(logs_dir, "log.txt")
 
 # Set log file path as an argument so we can access from everywhere.
 args.LOG = log_file_path
+args.LOG_DIR = logs_dir
 
 # Write information to the log file
 with open(log_file_path, mode='a') as log_file:
@@ -38,6 +40,13 @@ with open(log_file_path, mode='a') as log_file:
     log_file.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
 
+
+if args.PREP:
+    # Check for cache
+        # If no cache, run preprocess_all
+    preprocess_all(args)
+    args.ROOT = 'data/prep2'
+
 # Get loaders from prepare.py
 train_loader, val_loader, test_loader, weights = get_data_loaders(args)
 
@@ -46,7 +55,7 @@ train_loader, val_loader, test_loader, weights = get_data_loaders(args)
 if args.INCLUDE_NORMAL: args.num_classes = 3
 else: args.num_classes = 2
 
-if not args.MODEL in ['Resnet18', 'Unet', 'DeepLabv3']: raise NotImplementedError
+if not args.MODEL in ['Resnet18', 'Unet', 'DeepLabv3', 'EfficientNet']: raise NotImplementedError
 if not args.TASK in ['Classify', 'Segment']: raise NotImplementedError
 
 if args.AUG:
@@ -56,9 +65,9 @@ if args.AUG:
 model = train(args, train_loader = train_loader, val_loader = val_loader, weights = weights)
 
 # Save the model
-torch.save(model.state_dict(), f'{logs_dir}/model.pth')
+torch.save(model.state_dict(), f'{logs_dir}/final_model.pth')
 
-# test(args, test_loader)
+test(args, test_loader, weights=weights)
 
 # Best results classification so far.
 
@@ -66,4 +75,4 @@ torch.save(model.state_dict(), f'{logs_dir}/model.pth')
 
 # Best results segmentation so far.
 
-# python run.py --LR 0.01 --PRETRAINED --PREP --LOSS Dice --MODEL Unet --TASK Segment --INCLUDE_NORMAL --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ --TO cuda
+# python run.py --LR 0.01 --PRETRAINED --PREP --LOSS CrossEntropy --MODEL Unet --TASK Segment --EP 20 --SPLIT_RATIO 0.7:0.2:0.1 --ROOT data/ 

@@ -5,8 +5,10 @@ except ImportError as e:
 import numpy as np
 import cv2
 import torch 
-
-
+import os, glob
+from tqdm import tqdm
+import datetime
+import shutil
 # Reference of preprocessing: 
 
 # @inproceedings{inproceedings,
@@ -78,12 +80,42 @@ def preprocess(image_in):
         numpy.ndarray: Preprocessed image.
     """
     # Denoise the input image using the srad function (assumed to be available)
-    img = srad.srad(image_in, Iterations=200)
-    
+    img = srad.srad(image_in, Iterations=50) #change 200 to 50 
+     
     # Apply histogram equalization for further contrast enhancement
-    img = apply_histogram_equalization(img.astype(np.uint8))
+    img = apply_clahe(img.astype(np.uint8)) #change hist_eq to clahe
 
     return img
+
+def preprocess_all(args):
+
+    for label in ['benign', 'malignant', 'normal']:
+        path_pattern = os.path.join(args.ROOT, f'{label}/*.png')
+        file_paths = glob.glob(path_pattern)
+        for file_path in tqdm(file_paths, desc=f'Preprocessing {label} cases'):
+            filename = os.path.basename(file_path).split('.')[0]
+            target_path = f'data/prep2/{label}/{filename}.png'
+            if not os.path.exists(target_path):
+                if not '_mask' in file_path:
+                    img = cv2.imread(file_path)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    img = preprocess(img)
+
+                    cv2.imwrite(target_path, img)
+                else:
+                    # Copy the file to the destination directory
+                    shutil.copy(file_path, target_path)
+                continue
+            else:
+                continue
+    
+    # Write information to the log file
+    with open('data/prep/cache.log', mode='w') as log_file:
+        log_file.write("len(file_paths)")
+        log_file.write(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+
+    pass
 
 if __name__ == "__main__":
 

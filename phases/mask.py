@@ -18,8 +18,8 @@ def kmeans_roi(image, k=5):
     x, y, w, h = cv2.boundingRect(contours[0])
     return labels, (x, y, x + w, y + h), largest_cluster_mask
 
-def superpixel_roi(image, num_segments=50):
-    segments = slic(image, n_segments=num_segments, compactness=5)
+def superpixel_roi(image, num_segments=15):
+    segments = slic(image, n_segments=num_segments, compactness=3)
     largest_superpixel_label = np.argmax(np.bincount(segments.flat))
     largest_superpixel_mask = (segments == largest_superpixel_label).astype(np.uint8)
     props = regionprops(largest_superpixel_mask)[0]
@@ -71,9 +71,6 @@ if __name__ == '__main__':
     axs[3].set_title('K-means Largest')
 
     # Superpixel ROI
-    superpixel_roi_image = image.copy()
-    cv2.rectangle(superpixel_roi_image, (superpixel_roi_bbox[0], superpixel_roi_bbox[1]), (superpixel_roi_bbox[2], superpixel_roi_bbox[3]), (0, 255, 0), 2)
-    axs[4].imshow(cv2.cvtColor(superpixel_roi_image, cv2.COLOR_BGR2RGB))
     axs[4].imshow(segments)
 
     axs[4].set_title('Superpixel')

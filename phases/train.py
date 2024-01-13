@@ -2,141 +2,15 @@ import torchvision.models as models
 import torch
 from torch import optim
 from tqdm import tqdm 
-from torchmetrics import Accuracy, AUROC, F1Score, Dice
-from torcheval.metrics import MulticlassAccuracy, MulticlassF1Score, MulticlassPrecision
+
 import os, csv
 import time
 from .losses.focal import FocalLoss
-from .losses.dice import DiceLoss
 from .models.fpcn import FPCN
 from .submodules import attention
 from .submodules.backboned_unet import backboned_unet as unet 
-
-
-def calculate_clf_metrics(y, yhat, mode, device):
-    """
-    Calculate evaluation metrics given ground truth (y) and predicted values (yhat).
-    Args:
-        y (torch.Tensor): Ground truth labels.
-        yhat (torch.Tensor): Predicted labels.
-        mode (str): 'binary' or 'multiclass'.
-        device (str): Device ('cpu' or 'cuda').
-        label_mode (int): Label mode (1 for integer labels, 0 for one-hot encoded labels).
-    Returns:
-        dict: Dictionary containing computed metrics.
-    """
-    if mode == 'multiclass': num_classes = 3
-    else:num_classes = 2
-    
-    eval_clf_metrics = {
-        'accuracy_score': Accuracy(task=mode, num_classes=num_classes).to(device),
-        'roc_auc_score': AUROC(task=mode, num_classes=num_classes).to(device),
-        'f1_score': F1Score(mode, num_classes=num_classes).to(device),
-        'macro_acc_score': MulticlassAccuracy(average='macro', num_classes=num_classes),
-        'macro_f1_score': MulticlassF1Score(average='macro', num_classes=num_classes),
-        'macro_precision_score': MulticlassPrecision(average='macro', num_classes=num_classes),
-        'class_acc_score': MulticlassAccuracy(average=None, num_classes=num_classes),
-        'class_f1_score': MulticlassF1Score(average=None, num_classes=num_classes)
-        # 'confusion': ConfusionMatrix(mode, num_classes=num_classes).to(device)
-    }
-
-    scores = {
-        'accuracy_score': 0.0,
-        'roc_auc_score': 0.0,
-        'f1_score': 0.0,
-        'macro_acc_score': 0.0,
-        'macro_f1_score': 0.0,
-        'macro_precision_score': 0.0,
-        'class_acc_score': torch.tensor([0.0 for c in range(num_classes)]),
-        'class_f1_score': torch.tensor([0.0 for c in range(num_classes)])
-        # 'confusion': torch.zeros((3, 3), dtype=float)
-    }
-
-    # Compute evaluation metrics
-    with torch.no_grad():
-
-        for metric_name, metric in eval_clf_metrics.items():
-            
-            try:
-                y_max = torch.argmax(y, dim=1).to(device)
-
-                if 'macro' in metric_name or 'class' in metric_name:
-                    metric.update(yhat, y_max)
-                    metric_val = metric.compute()
-                    if 'class' in metric_name:
-                        # for i in range(num_classes):
-                        #     print(metric_name, scores[metric_name], metric_val)
-                        #     scores[metric_name][i] += metric_val[i]
-                        scores[metric_name] += metric_val
-                    else:
-                        scores[metric_name] += metric_val.item()
-
-                else:
-                    metric_val = metric(yhat, y_max)
-                    scores[metric_name] += metric_val.item()
-
-
-            except Exception as e:
-                print(str(e))
-                raise NotImplementedError
-
-
-        return scores
-
-
-def calculate_seg_metrics(y, yhat, mode, device):
-    """
-    Calculate evaluation metrics given ground truth (y) and predicted values (yhat).
-    Args:
-        y (torch.Tensor): Ground truth labels.
-        yhat (torch.Tensor): Predicted labels.
-        mode (str): 'binary' or 'multiclass'.
-        device (str): Device ('cpu' or 'cuda').
-        label_mode (int): Label mode (1 for integer labels, 0 for one-hot encoded labels).
-    Returns:
-        dict: Dictionary containing computed metrics.
-    """
-    if mode == 'multiclass': num_classes = 3
-    else:num_classes = 2
-    
-    eval_seg_metrics = {
-        'accuracy_score': Accuracy(task=mode, num_classes=num_classes).to(device),
-        'dice_score': DiceLoss(return_score=True),
-        'roc_auc_score': AUROC(task=mode, num_classes=num_classes).to(device),
-        # 'cohen_kappa_score': segmetrics.kapp_score_Value,
-        # 'mse_log_error': segmetrics.mse,
-        # 'nmi_score': segmetrics.nmi,
-        # 'roc_auc_score': segmetrics.roc_auc,
-    }
-
-    scores = {
-        'accuracy_score': 0.0,
-        'dice_score': 0.0,
-        'roc_auc_score': 0.0
-        # 'cohen_kappa_score': 0.0,
-        # 'mse_log_error': 0.0,
-        # 'nmi_score': 0.0,
-        # 'roc_auc_score': 0.0,
-    }
-
-    # Compute evaluation metrics
-    with torch.no_grad():
-
-        for metric_name, metric in eval_seg_metrics.items():
-            
-            try:
-                # yhat = torch.argmax(yhat, dim=1).unsqueeze(dim=1)
-                metric_val = metric(yhat, y.int())
-                scores[metric_name] += metric_val
-
-            except Exception as e:
-                print(str(e))
-                print(metric_name, metric)
-                raise NotImplementedError
-
-        return scores
-
-
+from .patch import patch
+from .metrics import calculate
 
 def train(args, train_loader, val_loader, weights):
     """
@@ -183,6 +57,14 @@ def train(args, train_loader, val_loader, weights):
         elif args.MODEL == 'FPCN':
             model =  FPCN(num_classes=args.num_classes, use_pretrained=True)
         
+        elif args.MODEL == 'EfficientNet':
+            if not args.ATTENTION: 
+                model = models.efficientnet_b0(pretrained=args.PRETRAINED)
+                num_ftrs = model.classifier[1].in_features
+                model.classifier[1] = torch.nn.Linear(num_ftrs, args.num_classes)
+            else:
+                model = attention.efficientb0attention(num_classes=args.num_classes, use_mask=True, scale_dot_product=True, pretrained=args.PRETRAINED)
+
         else:
             raise ValueError("Please select a valid model for Classification problem.")
 
@@ -222,6 +104,11 @@ def train(args, train_loader, val_loader, weights):
                               weight_decay=args.MOMENTUM)
     else:
         raise NotImplementedError
+    
+    if args.USE_SCHEDULER:
+        from torch.optim.lr_scheduler import StepLR
+        # Define the learning rate scheduler
+        scheduler = StepLR(optimizer, step_size=args.LR_STEP_SIZE, gamma=args.LR_GAMMA)
 
     with open(args.LOG, mode='a') as log_file:
         log_file.write(f"Class weights are calculated as following and will be used in Loss function. {weights}  \n")
@@ -236,7 +123,7 @@ def train(args, train_loader, val_loader, weights):
 
     elif args.TASK == 'Segment':
         if args.LOSS == 'Dice':
-            criterion = DiceLoss(reduction=None)
+            raise NotImplementedError
         elif args.LOSS == 'MSE':
             criterion = torch.nn.MSELoss(reduction='sum')
         elif args.LOSS == 'CrossEntropy':
@@ -250,6 +137,9 @@ def train(args, train_loader, val_loader, weights):
     mode = 'binary' if args.num_classes == 2 else 'multiclass'
 
     average_loss = 0.0
+    # Add this variable to track the best val accuracy
+    best_val_acc = 0.0
+
     for ep in tqdm(range(args.EP), unit='epoch'):
 
         start = time.time()
@@ -289,15 +179,21 @@ def train(args, train_loader, val_loader, weights):
             log_file.write(f"Epoch {ep}, Avg. Loss {average_loss}  \n")
         for batch, item in enumerate(train_loader):
 
+            if args.USE_PATCH: 
+                item = patch(item, patch_size=(args.PATCH_SQUARE_SIZE, args.PATCH_SQUARE_SIZE))
+            
+            
             X = item['image']
             y = item['label']
             m_ = item['mask'].to(device)
-            # Create a tensor filled with zeros of shape (batch_size, num_classes, w, h)
-            m = torch.zeros((m_.shape[0], args.num_classes, m_.shape[2], m_.shape[3]), device=device)
 
-            # Iterate over classes and set the corresponding channel to 1 where m_ equals the class index
-            for class_index in range(args.num_classes):
-                m[:, class_index, :, :] = (m_ == class_index).float().squeeze(1)
+            if args.TASK == 'Segment':
+                # Create a tensor filled with zeros of shape (batch_size, num_classes, w, h)
+                m = torch.zeros((m_.shape[0], args.num_classes, m_.shape[2], m_.shape[3]), device=device)
+
+                # Iterate over classes and set the corresponding channel to 1 where m_ equals the class index
+                for class_index in range(args.num_classes):
+                    m[:, class_index, :, :] = (m_ == class_index).float().squeeze(1)
 
 
             X = X / 255.0
@@ -315,18 +211,18 @@ def train(args, train_loader, val_loader, weights):
                     yhat = model(X)['out'].to(device)
 
             else: 
-                yhat = model(X, mask=m).to(device)
+                yhat = model(X, mask=m_).to(device)
             
             # print("\n \n Pred properties: ", yhat.shape, torch.unique(yhat))
 
             if args.TASK == 'Classify':
                 loss = criterion(yhat, y)
                 y = y.long()
-                train_metrics = {k: v + calculate_clf_metrics(y, yhat, mode, device)[k] for k, v in train_metrics.items()}
+                train_metrics = {k: v + calculate.calculate_clf_metrics(y, yhat, mode, device)[k] for k, v in train_metrics.items()}
 
             elif args.TASK == 'Segment':
                 loss = criterion(yhat, m)
-                train_metrics = {k: v + calculate_seg_metrics(m, yhat, mode, device)[k] for k, v in train_metrics.items()}
+                train_metrics = {k: v + calculate.calculate_seg_metrics(m, yhat, mode, device)[k] for k, v in train_metrics.items()}
             else:
                 raise NotImplementedError
             
@@ -334,6 +230,10 @@ def train(args, train_loader, val_loader, weights):
             # Update model, gradient descent.
             loss.backward()
             optimizer.step()
+            
+            if args.USE_SCHEDULER:
+                # Adjust learning rate
+                scheduler.step()
 
             train_loss += loss.item()
 
@@ -411,10 +311,10 @@ def train(args, train_loader, val_loader, weights):
                 if args.TASK == 'Classify':
                     loss = criterion(yhat, y)
                     y = y.long()
-                    val_metrics = {k: v + calculate_clf_metrics(y, yhat, mode, device)[k] for k, v in val_metrics.items()}
+                    val_metrics = {k: v + calculate.calculate_clf_metrics(y, yhat, mode, device)[k] for k, v in val_metrics.items()}
                 elif args.TASK == 'Segment':
                     loss = criterion(yhat, m)
-                    val_metrics = {k: v + calculate_seg_metrics(m, yhat, mode, device)[k] for k, v in val_metrics.items()}
+                    val_metrics = {k: v + calculate.calculate_seg_metrics(m, yhat, mode, device)[k] for k, v in val_metrics.items()}
 
                 else:
                     raise NotImplementedError
@@ -426,6 +326,14 @@ def train(args, train_loader, val_loader, weights):
         val_metrics = {k: v / len(val_loader) for k, v in val_metrics.items()}
 
         computation_time = (time.time() - start) / 60.0
+
+        # Check if the current model has the best validation loss
+        if val_metrics['accuracy_score'] > best_val_acc:
+            print("HALLO?? ITS ME???")
+            best_val_acc = val_metrics['accuracy_score'] 
+            # Save the model
+            torch.save(model.state_dict(), f'{args.LOG_DIR}/best_val_acc_model.pth')
+
         # Append metrics to CSV
         row = [ep + 1, train_loss] + list(train_metrics.values()) + [val_loss] + list(val_metrics.values()) + [computation_time]
     

@@ -1,0 +1,15 @@
+ROOT: data/raw
+LOSS: Focal
+MODEL: Resnet18
+TASK: Classify
+INCLUDE_NORMAL: True
+SPLIT_RATIO: 0.75:0.20:0.05
+ATTENTION: True
+USE_MASK: True
+EP: 20
+BATCH_SIZE: 64
+PRETRAINED: True
+SEED: 42
+LR: 0.01
+TO: cuda
+PREP: True
