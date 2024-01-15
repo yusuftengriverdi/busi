@@ -28,9 +28,12 @@ def train(args, train_loader, val_loader, weights):
                      'Class Acc Scores', 'Class f1 Scores']
     elif args.TASK == 'Segment':
         metric_titles = ['Acc Score', 'Dice Score', 'ROCAUC Score',
-                        #  'Cohen-Kappa Score', 'Mean Squared Log Err', 
-                        #  'Normalized MI Score', 'ROCAUC Score'
                          ]
+    elif args.TASK == 'Both':
+        metric_titles = ['Acc Score', 'Dice Score', 'ROCAUC Score', 'f1 Score', 
+                     'Macro Acc Score', 'Macro f1 Score',  'Macro Precision Score',
+                     'Class Acc Scores', 'Class f1 Scores']
+        
     # Directory to store training runs
     run_dir = os.path.join("training_runs", args.DATE)
     os.makedirs(run_dir, exist_ok=True)
@@ -83,6 +86,9 @@ def train(args, train_loader, val_loader, weights):
             model = models.detection.retinanet_resnet50_fpn(pretrained=args.PRETRAINED, 
                                                             num_classes=args.num_classes,
                                                             pretrained_backbone=True)
+        if args.MODEL == 'MaskRCNN':
+            model = models.detection.maskrcnn_resnet50_fpn(pretrained=args.PRETRAINED, 
+                                                            num_classes=args.num_classes)
         else:
             raise ValueError("Please select a valid model for Segmentification problem.")
 
@@ -133,6 +139,8 @@ def train(args, train_loader, val_loader, weights):
         else:
             raise ValueError("Please select a valid criterion for Classification problem.")
 
+    else:
+        criterion = torch.nn.CrossEntropyLoss(weight=weights).to(device)
 
     mode = 'binary' if args.num_classes == 2 else 'multiclass'
 
@@ -140,6 +148,7 @@ def train(args, train_loader, val_loader, weights):
     # Add this variable to track the best val accuracy
     best_val_acc = 0.0
 
+    
     for ep in tqdm(range(args.EP), unit='epoch'):
 
         start = time.time()
@@ -169,10 +178,6 @@ def train(args, train_loader, val_loader, weights):
                 'accuracy_score': 0.0,
                 'dice_score': 0.0,
                 'roc_auc_score': 0.0
-        # 'cohen_kappa_score': 0.0,
-        # 'mse_log_error': 0.0,
-        # 'nmi_score': 0.0,
-        # 'roc_auc_score': 0.0,
         }
 
         with open(args.LOG, mode='a') as log_file:
@@ -187,7 +192,10 @@ def train(args, train_loader, val_loader, weights):
             y = item['label']
             m_ = item['mask'].to(device)
 
-            if args.TASK == 'Segment':
+            if args.return_bbox:
+                b = item['bbox']
+
+            if args.TASK in ['Segment', 'Both']:
                 # Create a tensor filled with zeros of shape (batch_size, num_classes, w, h)
                 m = torch.zeros((m_.shape[0], args.num_classes, m_.shape[2], m_.shape[3]), device=device)
 
@@ -204,16 +212,20 @@ def train(args, train_loader, val_loader, weights):
 
             X = X.float().to(device).requires_grad_()
 
-            if not args.USE_MASK:
-                if args.MODEL != 'DeepLabv3':
-                    yhat = model(X).to(device)
-                else:
-                    yhat = model(X)['out'].to(device)
+            if args.TASK != 'Both':
+                if not args.USE_MASK:
+                    if args.MODEL != 'DeepLabv3':
+                        yhat = model(X).to(device)
+                    else:
+                        yhat = model(X)['out'].to(device)
 
-            else: 
-                yhat = model(X, mask=m_).to(device)
+                else: 
+                    yhat = model(X, mask=m_).to(device)
             
-            # print("\n \n Pred properties: ", yhat.shape, torch.unique(yhat))
+            else:
+                y = y.to(torch.int64)
+                yhat = model(X, [{'boxes': b[i], 'labels': y[i], 'masks': m[i]} for i in range(args.BATCH_SIZE)])
+            
 
             if args.TASK == 'Classify':
                 loss = criterion(yhat, y)
@@ -329,7 +341,6 @@ def train(args, train_loader, val_loader, weights):
 
         # Check if the current model has the best validation loss
         if val_metrics['accuracy_score'] > best_val_acc:
-            print("HALLO?? ITS ME???")
             best_val_acc = val_metrics['accuracy_score'] 
             # Save the model
             torch.save(model.state_dict(), f'{args.LOG_DIR}/best_val_acc_model.pth')

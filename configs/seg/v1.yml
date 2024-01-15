@@ -10,5 +10,5 @@ PRETRAINED: True
 BACKBONE: resnet18
 SEED: 42
 LR: 0.01
-TO: cuda
+TO: cpu
 PREP: False

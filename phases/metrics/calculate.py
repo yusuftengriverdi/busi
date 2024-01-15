@@ -95,20 +95,12 @@ def calculate_seg_metrics(y, yhat, mode, device):
         'accuracy_score': Accuracy(task=mode, num_classes=num_classes).to(device),
         'dice_score': DiceLoss(return_score=True),
         'roc_auc_score': AUROC(task=mode, num_classes=num_classes).to(device),
-        # 'cohen_kappa_score': segmetrics.kapp_score_Value,
-        # 'mse_log_error': segmetrics.mse,
-        # 'nmi_score': segmetrics.nmi,
-        # 'roc_auc_score': segmetrics.roc_auc,
     }
 
     scores = {
         'accuracy_score': 0.0,
         'dice_score': 0.0,
         'roc_auc_score': 0.0
-        # 'cohen_kappa_score': 0.0,
-        # 'mse_log_error': 0.0,
-        # 'nmi_score': 0.0,
-        # 'roc_auc_score': 0.0,
     }
 
     # Compute evaluation metrics
@@ -127,4 +119,7 @@ def calculate_seg_metrics(y, yhat, mode, device):
                 raise NotImplementedError
 
         return scores
+    
 
+def calculate_maskrcnn_metrics():
+    pass

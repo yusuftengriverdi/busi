@@ -83,7 +83,7 @@ def preprocess(image_in):
     img = srad.srad(image_in, Iterations=50) #change 200 to 50 
      
     # Apply histogram equalization for further contrast enhancement
-    img = apply_clahe(img.astype(np.uint8)) #change hist_eq to clahe
+    # img = apply_clahe(img.astype(np.uint8)) #change hist_eq to clahe
 
     return img
 
@@ -110,7 +110,7 @@ def preprocess_all(args):
                 continue
     
     # Write information to the log file
-    with open('data/prep/cache.log', mode='w') as log_file:
+    with open('data/prep2/cache.log', mode='w') as log_file:
         log_file.write("len(file_paths)")
         log_file.write(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 

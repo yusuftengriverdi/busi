@@ -87,8 +87,9 @@ class SubNet(nn.Module):
                                                 nn.Flatten(),  
                                                 nn.Linear(12544, 2048),  
                                                 # nn.BatchNorm2d(2048),
+                                                nn.Linear(2048, 512),
                                                 nn.ReLU(),
-                                                nn.Linear(2048, self.num_classes)
+                                                nn.Linear(512, self.num_classes)
                                             )
                                                         
 
@@ -104,24 +105,27 @@ class SubNet(nn.Module):
 
 class FPCN(nn.Module):
 
-    def __init__(self, num_classes, backbone=resnet18_features, use_pretrained=False):
+    def __init__(self, num_classes, backbone=resnet18_features, use_pretrained=False, device='cuda'):
         super(FPCN, self).__init__()
         self.num_classes = num_classes
 
         _resnet = backbone(pretrained=use_pretrained)
-        self.feature_pyramid = FeaturePyramid(_resnet)
+        self.feature_pyramid = FeaturePyramid(_resnet).to(device)
 
         # self.subnet_boxes = SubNet(mode='boxes', num_classes=self.num_classes)
         self.subnet_classes = SubNet(mode='classes', num_classes=self.num_classes)
+
+        self.device = device
 
     def forward(self, x):
         classes = []
 
         features = self.feature_pyramid(x)
         
+        features = [feature.to(self.device) for feature in features]
         # print([feature.shape for feature in features])
 
-        downsample = nn.Conv2d(256, 256, kernel_size=3, stride=2, padding=1)
+        downsample = nn.Conv2d(256, 256, kernel_size=3, stride=2, padding=1).to(self.device)
         upsample = self.feature_pyramid._upsample
 
         downsample_0_0 = downsample(features[0])

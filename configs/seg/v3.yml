@@ -1,5 +1,5 @@
 ROOT: data/raw
-LOSS: Dice
+LOSS: CrossEntropy
 MODEL: Unet
 TASK: Segment
 INCLUDE_NORMAL: False
@@ -7,8 +7,8 @@ SPLIT_RATIO: 0.75:0.20:0.05
 EP: 20
 BATCH_SIZE: 32
 PRETRAINED: True
-BACKBONE: resnet18
+BACKBONE: resnet50
 SEED: 42
 LR: 0.01
-TO: cuda
+TO: cpu
 PREP: True

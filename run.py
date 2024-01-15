@@ -39,7 +39,13 @@ with open(log_file_path, mode='a') as log_file:
     log_file.write("General Info: Hello, world!! \n")
     log_file.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
+if args.INCLUDE_NORMAL: args.num_classes = 3
+else: args.num_classes = 2
 
+if not args.MODEL in ['Resnet18', 'FPCN', 'Unet', 'EfficientNet', 'MaskRCNN', 'DeepLabv3']: raise NotImplementedError
+if not args.TASK in ['Classify', 'Segment', 'Both']: raise NotImplementedError
+
+args.return_bbox = True if args.TASK == 'Both' else False
 
 if args.PREP:
     # Check for cache
@@ -47,16 +53,11 @@ if args.PREP:
     preprocess_all(args)
     args.ROOT = 'data/prep2'
 
+
 # Get loaders from prepare.py
 train_loader, val_loader, test_loader, weights = get_data_loaders(args)
 
 # Now you can use train_loader, val_loader, and test_loader in the rest of run.py
-
-if args.INCLUDE_NORMAL: args.num_classes = 3
-else: args.num_classes = 2
-
-if not args.MODEL in ['Resnet18', 'Unet', 'DeepLabv3', 'EfficientNet']: raise NotImplementedError
-if not args.TASK in ['Classify', 'Segment']: raise NotImplementedError
 
 if args.AUG:
     train_loader = augment(args, train_loader, weights)
@@ -67,7 +68,7 @@ model = train(args, train_loader = train_loader, val_loader = val_loader, weight
 # Save the model
 torch.save(model.state_dict(), f'{logs_dir}/final_model.pth')
 
-test(args, test_loader, weights=weights)
+# test(args, test_loader, weights=weights)
 
 # Best results classification so far.
 

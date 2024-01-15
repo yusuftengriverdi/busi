@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch
 import os, sys
-
+from .submodules.bbox import compute_bbox
 
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), "."))
 # Add the parent directory to the Python path
@@ -42,7 +42,7 @@ def get_key_from_value(dict, value):
 
     
 
-def calculate_mean_std(dataset, cache_file="mean_std_cache.pth"):
+def calculate_mean_std(cache_file="mean_std_cache.pth"):
     if os.path.exists(cache_file):
         # Load cached mean and std from file
         mean_std_dict = torch.load(cache_file)
@@ -52,7 +52,7 @@ def calculate_mean_std(dataset, cache_file="mean_std_cache.pth"):
         # Calculate mean and std
         means = []
         stds = []
-        for item in tqdm(dataset, desc="Calculating mean and std"):
+        for item in tqdm(desc="Calculating mean and std"):
             img = item["image"]
             means.append(torch.mean(img))
             stds.append(torch.std(img))
@@ -82,7 +82,7 @@ class CustomDataset(Dataset):
                  transform=transform, 
                  mask_transform=transform,
                  log_dir= None, 
-                 # preprocessing=False
+                 return_bbox = False,
                  ):
         
         self.label_mapping = {}
@@ -100,6 +100,7 @@ class CustomDataset(Dataset):
         # if split_ratio:
         #     self.split_data()
         self.dir = log_dir
+        self.return_bbox = return_bbox
 
     def _read_data(self):
         """
@@ -124,14 +125,7 @@ class CustomDataset(Dataset):
                 'malignant': [0, 1, 0],
                 'normal': [0, 0, 1]
             }
-        elif self.mode == 2:
 
-            raise NotImplementedError
-            label_mapping = {
-                'benign': 'benign',
-                'malignant': 'malignant',
-                'normal': 'normal'
-            }
 
         # Reverse the mapping using tuples
         self.label_mapping = label_mapping
@@ -169,7 +163,10 @@ class CustomDataset(Dataset):
                     else:
                         mask = None
 
-                    data.append({'image': img, 'mask': mask, 'label': label_value, 'filename': filename})
+                    data.append({'image': img, 
+                                 'mask': mask, 
+                                 'label': label_value, 
+                                 'filename': filename})
                 else:
                     continue
 
@@ -206,84 +203,17 @@ class CustomDataset(Dataset):
         else:
             self.weights = list(label_counter.values())[:-2]
         return data
-
-    # def split_data(self):
-    #     """
-    #     Splits the data into training, validation, and test sets based on the specified split ratio.
-    #     """
-    #     if self.seed:
-    #         np.random.seed(self.seed)
-
-    #     images = []
-    #     masks = []
-    #     labels = []
-    #     filenames = []
-
-    #     for item in self.data:
-    #         images.append(item['image'])
-    #         labels.append(item['label'])
-    #         masks.append(item['mask'])
-    #         filenames.append(item['filename'])
-
-    #     images, labels, masks, filenames = np.array(images), np.array(labels), np.array(masks), np.array(filenames)
-
-    #     train_data, test_data, train_masks, test_masks, train_labels, test_labels, train_filenames, test_filenames = train_test_split(
-    #         images, masks, labels, filenames, test_size=self.split_ratio['test'], random_state=self.seed, stratify=labels
-    #     )
-
-    #     train_data, val_data, train_masks, val_masks, train_labels, val_labels, train_filenames, val_filenames = train_test_split(
-    #         train_data, train_masks, train_labels, train_filenames, test_size=self.split_ratio['val'],
-    #         random_state=self.seed, stratify=train_labels
-    #     )
-
-    #     self.train_data = [{'image':self.transform(img) if self.transform else img, 'mask': self.mask_transform(m) if self.mask_transform else m, 'label': label, 'filename': filename}
-    #                        for img, m, label, filename in zip(train_data, train_masks, train_labels, train_filenames)]
-    #     self.val_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.mask_transform(m) if self.mask_transform else m, 'label': label, 'filename': filename}
-    #                      for img, m, label, filename in zip(val_data, val_masks, val_labels, val_filenames)]
-    #     self.test_data = [{'image': self.transform(img) if self.transform else img, 'mask': self.mask_transform(m) if self.mask_transform else m, 'label': label, 'filename': filename}
-    #                       for img, m, label, filename in zip(test_data, test_masks, test_labels, test_filenames)]
-
-
-    # def get_dataloader(self, batch_size, shuffle, dataset_type = None):
-    #     """
-    #     Returns a DataLoader for the specified dataset type.
-    #     Args:
-    #         dataset_type (str): Type of dataset ('train', 'val', 'test').
-    #         batch_size (int): Batch size for DataLoader.
-    #         shuffle (bool): Whether to shuffle the data.
-    #     Returns:
-    #         torch.utils.data.DataLoader: DataLoader for the specified dataset type.
-    #     """
-    #     # if not hasattr(self, 'train_data'):
-    #     #     raise ValueError("Subsets not created. Call create_subsets method first.")
-
-    #     # if dataset_type == 'train':
-    #     #     data = self.train_data
-    #     # elif dataset_type == 'val':
-    #     #     data = self.val_data
-    #     # elif dataset_type == 'test':
-    #     #     data = self.test_data
-    #     # else:
-    #     #     raise ValueError("Invalid dataset_type. Use 'train', 'val', or 'test'.")
-
-    #     return DataLoader(self.data, batch_size=batch_size, shuffle=shuffle)
     
     def set_transform(self, transform, mask_transform = None):
 
         self.transform = transform
         if mask_transform:
             self.mask_transform = mask_transform
-        # if self.split_ratio:
-        #     self.split_data()
-
 
     def __len__(self):
         """
         Returns the number of samples in the dataset.
         """
-        # if self.split_ratio:
-        #     return {'train': len(self.train_data), 'val': len(self.val_data), 'test': len(self.test_data)}
-        # else:
         return len(self.data)
 
     def __getitem__(self, idx):
@@ -303,15 +233,22 @@ class CustomDataset(Dataset):
         label = item['label']
         filename = item['filename'] if 'filename' in item else None
 
-       # Apply preprocessing if specified in command-line arguments
-        # if self.preprocessing:
-        #     image = preprocess(image)
-
         if self.transform:
             image = self.transform(image)
 
         if self.mask_transform:
             mask = self.mask_transform(mask)
+
+        if self.return_bbox:
+            bbox = compute_bbox(mask[0])
+            # print(bbox)
+            # import matplotlib.pyplot as plt 
+            # plt.imshow(mask[0])
+            # plt.plot([bbox[0], bbox[2], bbox[2], bbox[0], bbox[0]],
+            #         [bbox[1], bbox[1], bbox[3], bbox[3], bbox[1]],
+            #         color='red', linewidth=2)
+            # plt.show()
+            return {'image': image, 'mask': mask, 'label': label, 'filename': filename, 'bbox': bbox}
 
         return {'image': image, 'mask': mask, 'label': label, 'filename': filename}
     
@@ -320,7 +257,7 @@ class SplitDataset(CustomDataset):
     def __init__(self, dataset, data = None, transform = None, mask_transform = None):
         self.transform = dataset.transform if not transform else transform
         self.mask_transform = dataset.mask_transform if not mask_transform else mask_transform
-        # self.preprocessing = preprocessing
+        self.return_bbox = dataset.return_bbox
         self.data = data
 
     def __getitem__(self, idx):
@@ -346,12 +283,12 @@ def get_data_loaders(args):
         image_size=(args.WIDTH, args.HEIGHT),
         seed=args.SEED,
         log_dir=args.DATE,
-        # preprocessing=False,
+        return_bbox=args.return_bbox
     )
 
     if args.PRETRAINED:
         # Calculate or load mean and std
-        mean, std = calculate_mean_std(dataset)
+        mean, std = calculate_mean_std()
 
         normalize = T.Normalize(mean=mean, std=std)
 
@@ -379,24 +316,38 @@ def get_data_loaders(args):
 
     images, labels, masks, filenames = np.array(images), np.array(labels), np.array(masks), np.array(filenames)
 
-    train_data, test_data, train_masks, test_masks, train_labels, test_labels, train_filenames, test_filenames = train_test_split(
-        images, masks, labels, filenames, test_size=split_ratio['test'], random_state=args.SEED, stratify=labels
-    )
+    if split_ratio['test'] != 0.0:
+        train_data, test_data, train_masks, test_masks, train_labels, test_labels, train_filenames, test_filenames = train_test_split(
+            images, masks, labels, filenames, test_size=split_ratio['test'], random_state=args.SEED, stratify=labels
+        )
 
-    train_data, val_data, train_masks, val_masks, train_labels, val_labels, train_filenames, val_filenames = train_test_split(
-        train_data, train_masks, train_labels, train_filenames, test_size=split_ratio['val'],
-        random_state=args.SEED, stratify=train_labels
-    )
+        train_data, val_data, train_masks, val_masks, train_labels, val_labels, train_filenames, val_filenames = train_test_split(
+            train_data, train_masks, train_labels, train_filenames, test_size=split_ratio['val'],
+            random_state=args.SEED, stratify=train_labels
+        )
+
+    else: 
+        train_data, val_data, train_masks, val_masks, train_labels, val_labels, train_filenames, val_filenames = train_test_split(
+            images, masks, labels, filenames, test_size=split_ratio['val'],
+            random_state=args.SEED, stratify=labels
+        )
+
 
     train_data = [{'image': img, 'mask': m, 'label': label, 'filename': filename}
                         for img, m, label, filename in zip(train_data, train_masks, train_labels, train_filenames)]
     val_data = [{'image': img, 'mask': m, 'label': label, 'filename': filename}
                         for img, m, label, filename in zip(val_data, val_masks, val_labels, val_filenames)]
-    test_data = [{'image': img, 'mask': m, 'label': label, 'filename': filename}
-                        for img, m, label, filename in zip(test_data, test_masks, test_labels, test_filenames)]
+    
+    if split_ratio['test'] != 0.0:
+        test_data = [{'image': img, 'mask': m, 'label': label, 'filename': filename}
+                            for img, m, label, filename in zip(test_data, test_masks, test_labels, test_filenames)]
+
+    else: 
+        test_data = []
 
     # Saves filenames, sets, image sets, and labels to a CSV file.
     data = {'filename': [], 'set': [], 'label': []}
+
 
     for set_type, set_data in zip(['train', 'val', 'test'], [train_data, val_data, test_data]):
         for item in set_data:
@@ -410,7 +361,9 @@ def get_data_loaders(args):
 
     trainDataset = SplitDataset(dataset=dataset, data=train_data)
     valDataset = SplitDataset(dataset=dataset, data=train_data)
-    testDataset = SplitDataset(dataset=dataset, data=train_data)
+
+    if split_ratio['test'] != 0.0:
+        testDataset = SplitDataset(dataset=dataset, data=train_data)
     
     # Example usage:
     # Accessing an example item
@@ -420,33 +373,31 @@ def get_data_loaders(args):
     label = sample_item['label']
     filename = sample_item['filename']
 
+    if args.return_bbox:
+        bbox = sample_item['bbox']
+    else: 
+        bbox = None
     # Create DataLoaders
     
     train_dataloader = DataLoader(trainDataset, batch_size=args.BATCH_SIZE, shuffle=True)
     val_dataloader = DataLoader(valDataset, args.BATCH_SIZE, shuffle=False)
-    test_dataloader = DataLoader(testDataset, args.BATCH_SIZE, shuffle=False)
-
-    # After creating the dataloaders
-    # for subset_name, dataloader in zip(['Train', 'Validation', 'Test'], [train_dataloader, val_dataloader, test_dataloader]):
-    #     print(f"\nSubset: {subset_name}")
-    #     sample = next(iter(dataloader))
-    #     print("Sample Image Shape: ", sample['image'].shape)
-    #     print("Sample Label Shape: ", sample['label'][0])
-    #     print("Sample Mask Shape: ", sample['mask'].shape)
-    #     print("Sample Filename: ", sample['filename'])
-
-    # Add more print statements or visualizations as needed
+    
+    if split_ratio['test'] != 0.0:
+        test_dataloader = DataLoader(testDataset, args.BATCH_SIZE, shuffle=False)
+    else:
+        test_dataloader = None
 
     with open(args.LOG, mode='a') as log_file:
         log_file.write("A sample image info: \n")
         log_file.write(f'Image shape: {image.shape}, Mask shape: {mask.shape if mask is not None else None},  \n'
-            f'Label: {label}, Filename: {filename} \n')
+            f'Label: {label}, Filename: {filename}, Bounding-box: {bbox} \n')
         
         log_file.write("Sizes of split sets --> \n ")
         log_file.write(f"Train: {len(train_dataloader) * args.BATCH_SIZE} \n")
         log_file.write(f"Validation: {len(val_dataloader) * args.BATCH_SIZE} \n")
-        log_file.write(f"Test: {len(test_dataloader) * args.BATCH_SIZE} \n")
+        # log_file.write(f"Test: {len(test_dataloader) * args.BATCH_SIZE} \n")
         log_file.write("Dataset is ready!  \n")
+
 
     return train_dataloader, val_dataloader, test_dataloader, dataset.weights
 

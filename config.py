@@ -11,12 +11,13 @@ def parse_arguments():
 
     # Optional configuration file argument
     parser.add_argument("--config", type=str, help="Path to the configuration file (YAML format)", default=None)
+    parser.add_argument("--ROOT", type=str, help="Root to data.", default='data/raw')
 
     # Data-related arguments.
     parser.add_argument("--MODE", type=int, help="Mode (0/1/2)", required=False, default=1)
     parser.add_argument("--INCLUDE_NORMAL", action="store_true", help="Include normal cases", default=False)
-    parser.add_argument("--WIDTH", type=int, help="Width for image resizing", default=512)
-    parser.add_argument("--HEIGHT", type=int, help="Height for image resizing", default=512)
+    parser.add_argument("--WIDTH", type=int, help="Width for image resizing", default=256)
+    parser.add_argument("--HEIGHT", type=int, help="Height for image resizing", default=256)
 
     # Split arguments
     parser.add_argument("--SPLIT_RATIO", type=str, help="Split ratio for train-val-test as x:y:z", default=None)
@@ -63,6 +64,7 @@ def parse_arguments():
     # Patch arguments.
     parser.add_argument("--USE_PATCH", action="store_true", help="Use spatial attention layer or not", default=False)
     parser.add_argument("--PATCH_SQUARE_SIZE", type=int, help="Number of Epochs", default= 75)
+
 
     args = parser.parse_args()
 

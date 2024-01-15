@@ -53,11 +53,11 @@ class resnet18attention(nn.Module):
         return output
 
 class efficientb0attention(nn.Module):
-    def __init__(self, num_classes, attention_channels=512, use_mask=False, scale_dot_product=False, pretrained=True):
+    def __init__(self, num_classes, attention_channels=1280, use_mask=False, scale_dot_product=False, pretrained=True):
         super(efficientb0attention, self).__init__()
         # Load pre-trained ResNet
         self.efficientnet = efficientnet_b0(pretrained=pretrained)
-        self.efficientnet.avgpool = nn.Identity()
+        # self.efficientnet.avgpool = nn.Identity()
         # Remove the original fully connected layer
         self.efficientnet.classifier = nn.Identity()
         # Add attention mechanism
@@ -72,7 +72,7 @@ class efficientb0attention(nn.Module):
         if self.use_mask and mask is not None:
             x = x * mask
         # Get ResNet features
-        features = self.resnet(x).reshape(-1, 512, 1, 1)
+        features = self.efficientnet(x).reshape(-1, 1280, 1, 1)
         # Apply soft attention
         attended_features = self.attention(features)
         # Global average pooling
